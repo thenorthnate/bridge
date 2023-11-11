@@ -13,28 +13,33 @@ import (
 // until another Start call is made.
 
 type Link struct {
-	start       time.Time
-	duration    time.Duration
-	err         error
-	errDuration time.Duration
+	start    time.Time
+	isActive bool
+	err      error
 	// save the previous X (e.g. 1000) execution times in this
 	// array and then compute the quartiles of it periodically
 	// and check where the current execution duration is relative
 	// to those values (and some cutoff... > 1min different) then
 	// alert based on execution times.
-	historyCount int
-	historyIndex int
-	history      []float64
+	historyCount   int
+	historyIndex   int
+	successHistory []float64
 }
 
 func (link *Link) Start() {
 	link.start = time.Now().UTC()
+	link.isActive = true
 }
 
 func (link *Link) Done(err error) {
+	link.isActive = false
 	link.err = err
-	link.duration = time.Since(link.start)
 	if err != nil {
-		link.errDuration = link.duration
+		return
+	}
+	link.successHistory[link.historyIndex] = time.Since(link.start).Seconds()
+	link.historyIndex = (link.historyIndex + 1) % len(link.successHistory)
+	if link.historyCount < len(link.successHistory) {
+		link.historyCount++
 	}
 }
